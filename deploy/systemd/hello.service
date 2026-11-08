@@ -1,0 +1,21 @@
+[Unit]
+Description=MSD hello HTTP service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=hello
+Group=hello
+Environment=PORT=80
+ExecStart=/usr/bin/python3 /opt/hello/server.py
+Restart=always
+RestartSec=2
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

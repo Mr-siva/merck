@@ -1,0 +1,51 @@
+name: ci
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  app:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install ruff && ruff check app
+      - run: cd app && python -m unittest -v
+      - name: Docker smoke test
+        run: |
+          docker build -t msd-hello .
+          docker run -d --name hello -p 8080:8080 msd-hello
+          for i in $(seq 1 10); do curl -fsS localhost:8080/health && break || sleep 1; done
+          curl -fsS localhost:8080/
+
+  scripts-and-units:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: shellcheck deploy/healthcheck.sh
+      - name: Verify systemd units
+        run: |
+          sudo install -m755 deploy/healthcheck.sh /usr/local/bin/healthcheck.sh
+          sudo mkdir -p /opt/hello && sudo cp app/server.py /opt/hello/
+          systemd-analyze verify --man=false deploy/systemd/*.service deploy/systemd/*.timer || true
+
+  terraform:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - run: terraform fmt -check -recursive
+      - name: Validate
+        working-directory: terraform
+        run: |
+          ssh-keygen -t ed25519 -N "" -f /tmp/k -q
+          terraform init -backend=false
+          terraform validate
+
+  # Deployment is intentionally manual: no cloud credentials live in this repo.
+  # To enable, add AWS creds as environment secrets, then run `terraform apply` here.

@@ -1,0 +1,12 @@
+creds
+*.pem
+.env
+.aws/
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!terraform.tfvars.example
+crash.log
+__pycache__/
+.venv/

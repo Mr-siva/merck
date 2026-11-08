@@ -1,0 +1,6 @@
+[Unit]
+Description=MSD hello health check (restarts hello on failure)
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/healthcheck.sh
