@@ -9,10 +9,10 @@ permissions:
 
 jobs:
   app:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with: { python-version: "3.12" }
       - run: pip install ruff && ruff check app
       - run: cd app && python -m unittest -v
@@ -24,26 +24,43 @@ jobs:
           curl -fsS localhost:8080/
 
   scripts-and-units:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - run: shellcheck deploy/healthcheck.sh
-      - name: Verify systemd units
+      - name: Install units exactly as cloud-init does
         run: |
+          sudo useradd --system --shell /usr/sbin/nologin hello
+          sudo install -Dm644 app/server.py /opt/hello/server.py
           sudo install -m755 deploy/healthcheck.sh /usr/local/bin/healthcheck.sh
-          sudo mkdir -p /opt/hello && sudo cp app/server.py /opt/hello/
-          systemd-analyze verify --man=false deploy/systemd/*.service deploy/systemd/*.timer || true
+          sudo install -m644 deploy/systemd/* /etc/systemd/system/
+          sudo systemctl daemon-reload
+      - name: Verify systemd units (fails on any error)
+        run: sudo systemd-analyze verify --man=false /etc/systemd/system/hello.service /etc/systemd/system/healthcheck.service /etc/systemd/system/healthcheck.timer
+      - name: Start service and run the real health check
+        run: |
+          sudo systemctl start hello
+          sleep 2
+          systemctl is-active hello
+          sudo /usr/local/bin/healthcheck.sh && echo "healthcheck: OK"
+      - name: Failure path - health check must detect and restart
+        run: |
+          sudo systemctl stop hello
+          rc=0; sudo RETRY_SLEEP=1 /usr/local/bin/healthcheck.sh || rc=$?
+          echo "healthcheck exit code: $rc (1 = restarted)"
+          test "$rc" -eq 1
+          systemctl is-active hello
+          sudo journalctl -t healthcheck --no-pager
 
   terraform:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: hashicorp/setup-terraform@v3
       - run: terraform fmt -check -recursive
       - name: Validate
         working-directory: terraform
         run: |
-          ssh-keygen -t ed25519 -N "" -f /tmp/k -q
           terraform init -backend=false
           terraform validate
 

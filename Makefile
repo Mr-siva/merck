@@ -3,7 +3,7 @@ test:
 	cd app && python3 -m unittest -v
 lint:
 	shellcheck deploy/healthcheck.sh
-	python3 -m ruff check app || true
+	python3 -m ruff check app
 run-local:
 	PORT=8080 python3 app/server.py
 docker-smoke:

@@ -9,3 +9,7 @@ output "url" {
 output "ssh" {
   value = var.admin_cidr == "" ? "SSH disabled" : "ssh -i ~/.ssh/msd_key ubuntu@${aws_instance.hello.public_ip}"
 }
+
+output "instance_id" {
+  value = aws_instance.hello.id
+}
